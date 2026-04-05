@@ -36,4 +36,9 @@ new_sqlite_classes = ["ChannelRoom", "Scheduler"]
 
 [assets]
 directory = "./frontend/dist"
-binding = "ASSETS"
+not_found_handling = "single-page-application"
+run_worker_first = ["/api/*", "/files/*"]
+
+[triggers]
+# Cloudflare Cron 按 UTC 执行；19:00 UTC = 北京时间每天 03:00
+crons = ["0 19 * * *"]

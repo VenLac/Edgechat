@@ -20,11 +20,6 @@ app.use('/api/*', cors({
   allowMethods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS']
 }));
 
-app.use('*', async (c, next) => {
-  c.executionCtx.waitUntil(initScheduler(c.env));
-  await next();
-});
-
 app.get('/api/health', (c) => c.json({ ok: true }));
 
 app.post('/api/auth/login', async (c) => {
@@ -190,6 +185,125 @@ app.get('/api/users', async (c) => {
   });
 });
 
+app.get('/api/bootstrap', async (c) => {
+  const session = c.get('session');
+  const [usersResult, channelsResult, dmsResult] = await Promise.all([
+    c.env.DB.prepare(
+      `SELECT id, username, display_name, avatar_key
+       FROM users
+       WHERE deleted_at IS NULL
+         AND is_disabled = 0
+         AND id != ?
+       ORDER BY display_name ASC`
+    )
+      .bind(session.userId)
+      .all(),
+    c.env.DB.prepare(
+      `SELECT
+         c.id,
+         c.name,
+         c.description,
+         c.kind,
+         owner.display_name AS owner_display_name,
+         EXISTS (
+           SELECT 1 FROM channel_members cm
+           WHERE cm.channel_id = c.id AND cm.user_id = ?
+         ) AS is_member,
+         COALESCE((
+           SELECT cm.role
+           FROM channel_members cm
+           WHERE cm.channel_id = c.id AND cm.user_id = ?
+           LIMIT 1
+         ), '') AS my_role,
+         EXISTS (
+           SELECT 1 FROM channel_members cm
+           WHERE cm.channel_id = c.id AND cm.user_id = ? AND cm.role = 'owner'
+         ) AS can_manage,
+         (
+           SELECT COUNT(*)
+           FROM channel_members cm
+           WHERE cm.channel_id = c.id
+         ) AS member_count,
+         (
+           SELECT MAX(m.created_at)
+           FROM messages m
+           WHERE m.channel_id = c.id AND m.deleted_at IS NULL
+         ) AS last_message_at
+       FROM channels c
+       LEFT JOIN users owner ON owner.id = c.created_by
+       WHERE c.kind IN ('public', 'private')
+         AND c.deleted_at IS NULL
+         AND (
+           c.kind = 'public'
+           OR EXISTS (
+             SELECT 1 FROM channel_members cm
+             WHERE cm.channel_id = c.id AND cm.user_id = ?
+           )
+         )
+       ORDER BY CASE c.kind WHEN 'public' THEN 0 ELSE 1 END, c.name ASC`
+    )
+      .bind(session.userId, session.userId, session.userId, session.userId)
+      .all(),
+    c.env.DB.prepare(
+      `SELECT
+         c.id,
+         c.dm_key,
+         other.id AS other_user_id,
+         other.username AS other_username,
+         other.display_name AS other_display_name,
+         other.avatar_key AS other_avatar_key,
+         (
+           SELECT MAX(m.created_at)
+           FROM messages m
+           WHERE m.channel_id = c.id AND m.deleted_at IS NULL
+         ) AS last_message_at
+       FROM channels c
+       JOIN channel_members me ON me.channel_id = c.id AND me.user_id = ?
+       JOIN channel_members peer ON peer.channel_id = c.id AND peer.user_id != ?
+       JOIN users other ON other.id = peer.user_id
+       WHERE c.kind = 'dm'
+         AND c.deleted_at IS NULL
+         AND other.deleted_at IS NULL
+       ORDER BY last_message_at DESC NULLS LAST, c.id DESC`
+    )
+      .bind(session.userId, session.userId)
+      .all()
+  ]);
+
+  return c.json({
+    users: usersResult.results.map((row) => ({
+      id: Number(row.id),
+      username: row.username,
+      displayName: row.display_name,
+      avatarUrl: row.avatar_key ? `/files/${encodeURIComponent(row.avatar_key)}` : ''
+    })),
+    channels: channelsResult.results.map((row) => ({
+      id: Number(row.id),
+      name: row.name,
+      description: row.description,
+      kind: row.kind,
+      ownerDisplayName: row.owner_display_name || '',
+      isMember: Boolean(Number(row.is_member)),
+      myRole: row.my_role || '',
+      canManage: Boolean(Number(row.can_manage)),
+      memberCount: Number(row.member_count || 0),
+      lastMessageAt: row.last_message_at || null
+    })),
+    dms: dmsResult.results.map((row) => ({
+      id: Number(row.id),
+      kind: 'dm',
+      name: row.dm_key,
+      lastMessageAt: row.last_message_at || null,
+      otherUser: {
+        id: Number(row.other_user_id),
+        username: row.other_username,
+        displayName: row.other_display_name,
+        avatarUrl: row.other_avatar_key ? `/files/${encodeURIComponent(row.other_avatar_key)}` : ''
+      }
+    }))
+  });
+});
+
 app.use('/api/admin/*', adminMiddleware);
 
 registerMessageRoutes(app);
@@ -219,23 +333,27 @@ app.notFound(async (c) => {
   if (new URL(c.req.url).pathname.startsWith('/api/')) {
     return errorResponse('接口不存在', 404);
   }
-
-  const assetResponse = await c.env.ASSETS.fetch(c.req.raw);
-  if (assetResponse.status !== 404) {
-    return assetResponse;
-  }
-
-  const url = new URL(c.req.url);
-  url.pathname = '/index.html';
-  return c.env.ASSETS.fetch(new Request(url.toString(), c.req.raw));
+  return new Response('Not Found', { status: 404 });
 });
 
 app.onError((error) => errorResponse(error.message || '服务器开小差了', 500));
 
-async function initScheduler(env) {
-  const stub = env.SCHEDULER.get(env.SCHEDULER.idFromName('global-cleanup'));
-  await stub.fetch('https://scheduler.internal/init');
+async function cleanupExpiredMessages(env) {
+  const retentionDays = Number(env.MESSAGE_RETENTION_DAYS || 7);
+  await env.DB.prepare(
+    `UPDATE messages
+     SET deleted_at = CURRENT_TIMESTAMP
+     WHERE deleted_at IS NULL
+       AND created_at < datetime('now', ?)`
+  )
+    .bind(`-${retentionDays} day`)
+    .run();
 }
 
-export default app;
+export default {
+  fetch: app.fetch,
+  async scheduled(_controller, env, ctx) {
+    ctx.waitUntil(cleanupExpiredMessages(env));
+  }
+};
 export { ChannelRoom, Scheduler };

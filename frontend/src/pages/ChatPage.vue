@@ -188,14 +188,10 @@ function setQuickActionMode(mode) {
 async function refreshSidebar() {
   sidebarLoading.value = true;
   try {
-    const [channelPayload, dmPayload, userPayload] = await Promise.all([
-      api.getChannels(),
-      api.listDms(),
-      api.getUsers()
-    ]);
-    channels.value = channelPayload.channels || [];
-    dms.value = dmPayload.dms || [];
-    users.value = userPayload.users || [];
+    const payload = await api.bootstrap();
+    channels.value = payload.channels || [];
+    dms.value = payload.dms || [];
+    users.value = payload.users || [];
   } finally {
     sidebarLoading.value = false;
   }

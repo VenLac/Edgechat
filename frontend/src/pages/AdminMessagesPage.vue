@@ -24,14 +24,10 @@ async function loadAll() {
   loading.value = true;
   error.value = '';
   try {
-    const [userPayload, channelPayload, dmPayload] = await Promise.all([
-      api.adminUsers(),
-      api.adminChannels(),
-      api.adminDms()
-    ]);
-    users.value = userPayload.users;
-    channels.value = channelPayload.channels;
-    dms.value = dmPayload.dms;
+    const payload = await api.adminOverview();
+    users.value = payload.users;
+    channels.value = payload.channels;
+    dms.value = payload.dms;
   } catch (currentError) {
     error.value = currentError.message;
   } finally {
