@@ -3,6 +3,102 @@ import { listMessages, requireAccessibleRoom } from '../db.js';
 import { errorResponse, parseJsonRequest, sanitizeLimit } from '../utils.js';
 
 export function registerAdminRoutes(app) {
+  app.get('/api/admin/overview', async (c) => {
+    const [usersResult, channelsResult, dmsResult] = await Promise.all([
+      c.env.DB.prepare(
+        `SELECT
+           id,
+           username,
+           display_name,
+           avatar_key,
+           is_disabled,
+           created_at
+         FROM users
+         WHERE deleted_at IS NULL
+         ORDER BY created_at DESC`
+      ).all(),
+      c.env.DB.prepare(
+        `SELECT
+           c.id,
+           c.name,
+           c.description,
+           c.kind,
+           c.created_at,
+           owner.display_name AS owner_display_name,
+           (
+             SELECT COUNT(*)
+             FROM channel_members cm
+             WHERE cm.channel_id = c.id
+           ) AS member_count,
+           (
+             SELECT COUNT(*)
+             FROM messages m
+             WHERE m.channel_id = c.id AND m.deleted_at IS NULL
+           ) AS message_count
+         FROM channels c
+         LEFT JOIN users owner ON owner.id = c.created_by
+         WHERE c.deleted_at IS NULL
+           AND c.kind IN ('public', 'private')
+         ORDER BY c.created_at DESC`
+      ).all(),
+      c.env.DB.prepare(
+        `SELECT
+           c.id,
+           c.dm_key,
+           c.created_at,
+           (
+             SELECT GROUP_CONCAT(display_name, ' / ')
+             FROM (
+               SELECT u.display_name AS display_name
+               FROM channel_members cm
+               JOIN users u ON u.id = cm.user_id
+               WHERE cm.channel_id = c.id
+                 AND u.deleted_at IS NULL
+               ORDER BY u.id ASC
+             )
+           ) AS participants,
+           (
+             SELECT COUNT(*)
+             FROM messages m
+             WHERE m.channel_id = c.id
+               AND m.deleted_at IS NULL
+           ) AS message_count
+         FROM channels c
+         WHERE c.kind = 'dm'
+           AND c.deleted_at IS NULL
+         ORDER BY c.created_at DESC`
+      ).all()
+    ]);
+
+    return c.json({
+      users: usersResult.results.map((row) => ({
+        id: Number(row.id),
+        username: row.username,
+        displayName: row.display_name,
+        avatarUrl: row.avatar_key ? `/files/${encodeURIComponent(row.avatar_key)}` : '',
+        isDisabled: Boolean(Number(row.is_disabled)),
+        createdAt: row.created_at
+      })),
+      channels: channelsResult.results.map((row) => ({
+        id: Number(row.id),
+        name: row.name,
+        description: row.description,
+        kind: row.kind,
+        createdAt: row.created_at,
+        ownerDisplayName: row.owner_display_name || '未知',
+        memberCount: Number(row.member_count),
+        messageCount: Number(row.message_count)
+      })),
+      dms: dmsResult.results.map((row) => ({
+        id: Number(row.id),
+        name: row.dm_key,
+        participants: row.participants,
+        createdAt: row.created_at,
+        messageCount: Number(row.message_count)
+      }))
+    });
+  });
+
   app.get('/api/admin/users', async (c) => {
     const { results } = await c.env.DB.prepare(
       `SELECT

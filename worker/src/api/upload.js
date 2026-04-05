@@ -1,5 +1,7 @@
 import { errorResponse } from '../utils.js';
 
+const FILE_BROWSER_CACHE_CONTROL = 'public, max-age=31536000, immutable';
+
 function validateUpload(env, file) {
   const maxFileSize = Number(env.MAX_FILE_SIZE || 20971520);
   if (file.size > maxFileSize) {
@@ -35,7 +37,8 @@ export function registerUploadRoutes(app) {
     const key = `${session.userId}/${Date.now()}-${crypto.randomUUID()}${extension}`;
     await c.env.FILES.put(key, await file.arrayBuffer(), {
       httpMetadata: {
-        contentType: file.type || 'application/octet-stream'
+        contentType: file.type || 'application/octet-stream',
+        cacheControl: FILE_BROWSER_CACHE_CONTROL
       }
     });
 
@@ -60,6 +63,19 @@ export function registerUploadRoutes(app) {
     const headers = new Headers();
     object.writeHttpMetadata(headers);
     headers.set('etag', object.httpEtag);
+    headers.set('cache-control', headers.get('cache-control') || FILE_BROWSER_CACHE_CONTROL);
+    if (object.uploaded) {
+      headers.set('last-modified', object.uploaded.toUTCString());
+    }
+
+    const ifNoneMatch = c.req.header('if-none-match');
+    if (ifNoneMatch && ifNoneMatch === object.httpEtag) {
+      return new Response(null, {
+        status: 304,
+        headers
+      });
+    }
+
     return new Response(object.body, { headers });
   });
 }

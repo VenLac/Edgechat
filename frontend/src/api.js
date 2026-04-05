@@ -64,6 +64,9 @@ export default {
   getUsers() {
     return request('/users');
   },
+  bootstrap() {
+    return request('/bootstrap');
+  },
   getChannels() {
     return request('/channels');
   },
@@ -138,6 +141,9 @@ export default {
   },
   adminUsers() {
     return request('/admin/users');
+  },
+  adminOverview() {
+    return request('/admin/overview');
   },
   createUser(payload) {
     return request('/admin/users', {
