@@ -1,5 +1,6 @@
 # Sensitive information
 cf key.txt
+wrangler.toml
 
 # Project documentation (not for GitHub)
 项目文档.md
