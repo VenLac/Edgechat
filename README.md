@@ -35,6 +35,7 @@ EdgeChat 是一个运行在 Cloudflare Workers 上的团队聊天系统。它提
 - 会话：Cloudflare KV
 - 文件：Cloudflare R2
 - 部署：Wrangler
+<img width="2198" height="1932" alt="屏幕截图 2026-04-06 155015" src="https://github.com/user-attachments/assets/38949307-5d81-4a0a-8b4e-df557057c7c7" />
 
 ## 项目结构
 
