@@ -73,7 +73,7 @@ CREATE TABLE IF NOT EXISTS registration_invites (
 );
 
 INSERT OR IGNORE INTO site_settings (setting_key, setting_value)
-VALUES ('site_name', 'CF Chat');
+VALUES ('site_name', 'Edgechat');
 
 INSERT OR IGNORE INTO site_settings (setting_key, setting_value)
 VALUES ('site_icon_url', '');
