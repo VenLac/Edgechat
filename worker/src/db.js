@@ -20,6 +20,22 @@ export async function getUserByUsername(db, username) {
   return results[0] || null;
 }
 
+export async function isUserActiveById(db, userId) {
+  const { results } = await db
+    .prepare(
+      `SELECT id
+       FROM users
+       WHERE id = ?
+         AND deleted_at IS NULL
+         AND is_disabled = 0
+       LIMIT 1`
+    )
+    .bind(Number(userId))
+    .all();
+
+  return Boolean(results[0]);
+}
+
 export async function getSiteSettings(db) {
   const { results } = await db
     .prepare(
@@ -76,7 +92,7 @@ export async function updateSiteSettings(db, { siteName, siteIconUrl }) {
 export async function getChannelById(db, channelId) {
   const { results } = await db
     .prepare(
-      `SELECT id, name, description, kind, dm_key, created_by
+      `SELECT id, name, description, avatar_key, kind, dm_key, created_by
        FROM channels
        WHERE id = ?
          AND deleted_at IS NULL
@@ -114,7 +130,7 @@ export async function requireAccessibleRoom(db, userId, kind, roomId, isAdmin = 
     : 'EXISTS (SELECT 1 FROM channel_members cm WHERE cm.channel_id = c.id AND cm.user_id = ?)';
 
   const statement = db.prepare(
-    `SELECT c.id, c.name, c.description, c.kind, c.dm_key
+    `SELECT c.id, c.name, c.description, c.avatar_key, c.kind, c.dm_key
      FROM channels c
      WHERE c.id = ?
        AND c.kind = ?
@@ -221,7 +237,7 @@ export async function insertMessage(db, { channelId, senderId, content, attachme
   const cleanContent = String(content || '').trim();
 
   if (!cleanContent && !cleanAttachment) {
-    throw new Error('消息内容不能为空');
+    throw new Error('Message content cannot be empty');
   }
 
   const result = await db
