@@ -155,6 +155,24 @@ MAX_FILE_SIZE = "20971520"
 
 - [TECHNICAL.md](/C:/Users/temp/code/cfchat/TECHNICAL.md)
 
+## All Contributors
+
+Thanks to the contributors who helped improve this project:
+
+<table>
+  <tr>
+    <td align="center">
+      <a href="https://github.com/VenLac">
+        <img src="https://github.com/VenLac.png?size=100" width="100px;" alt="VenLac" />
+        <br />
+        <sub><b>VenLac</b></sub>
+      </a>
+      <br />
+      UI &amp; Security
+    </td>
+  </tr>
+</table>
+
 ## 协议说明
 
 本项目采用 `GNU GPL v3.0 or later`。
