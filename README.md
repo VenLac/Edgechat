@@ -193,6 +193,12 @@ Required GitHub repository secrets:
 - `CLOUDFLARE_API_TOKEN`
 - `CLOUDFLARE_ACCOUNT_ID`
 
+Optional secrets for admin bootstrap:
+
+- `CFCHAT_ADMIN_USERNAME`
+- `CFCHAT_ADMIN_PASSWORD`
+- `CFCHAT_ADMIN_DISPLAY_NAME` (optional, defaults to username)
+
 Recommended token scopes:
 
 - `Workers Scripts:Edit`
@@ -209,5 +215,6 @@ Deployment behavior:
 - R2 bucket: `cfchat-files`
 - On first-time D1 creation, it initializes schema with `worker/schema.sql`.
 - On later runs, it reuses existing resources and only updates the same Worker (`name = "cfchat"`).
+- If admin bootstrap secrets are set, the workflow will create (or recover) that admin account during deploy.
 - Cron triggers are synced by `wrangler deploy` from `[triggers]` in the generated CI config.
 - SQL files in `worker/migrations/` are intentionally not auto-run in CI.

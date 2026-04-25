@@ -50,5 +50,17 @@ jobs:
         if: steps.ensure_resources.outputs.d1_created == 'true'
         run: npx wrangler d1 execute ${{ steps.ensure_resources.outputs.d1_database_name }} --remote --file worker/schema.sql --config wrangler.ci.toml
 
+      - name: Generate admin bootstrap SQL (optional)
+        if: ${{ secrets.CFCHAT_ADMIN_USERNAME != '' && secrets.CFCHAT_ADMIN_PASSWORD != '' }}
+        run: node .github/scripts/generate-admin-bootstrap-sql.mjs
+        env:
+          CFCHAT_ADMIN_USERNAME: ${{ secrets.CFCHAT_ADMIN_USERNAME }}
+          CFCHAT_ADMIN_PASSWORD: ${{ secrets.CFCHAT_ADMIN_PASSWORD }}
+          CFCHAT_ADMIN_DISPLAY_NAME: ${{ secrets.CFCHAT_ADMIN_DISPLAY_NAME }}
+
+      - name: Ensure admin user (optional)
+        if: ${{ secrets.CFCHAT_ADMIN_USERNAME != '' && secrets.CFCHAT_ADMIN_PASSWORD != '' }}
+        run: npx wrangler d1 execute ${{ steps.ensure_resources.outputs.d1_database_name }} --remote --file .tmp/cfchat-admin-upsert.sql --config wrangler.ci.toml
+
       - name: Deploy worker
         run: npx wrangler deploy --config wrangler.ci.toml
