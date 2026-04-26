@@ -142,7 +142,7 @@ MAX_FILE_SIZE = "20971520"
 - `/admin/messages`：消息查看
 - `/admin/site`：网站设置
 
-## 贡献者
+## 致谢
 
 感谢所有为项目提供帮助的贡献者：
 
@@ -159,6 +159,8 @@ MAX_FILE_SIZE = "20971520"
     </td>
   </tr>
 </table>
+
+并在此，由衷地感谢[linux.do](https://linux.do)社区对本项目的支持。
 
 ## 协议说明
 
